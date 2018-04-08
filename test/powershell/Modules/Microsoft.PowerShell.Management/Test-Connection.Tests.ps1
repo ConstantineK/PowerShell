@@ -67,6 +67,25 @@ Describe "Test-Connection" -tags "CI" {
             $result2 | Should -BeFalse
         }
 
+        It "Produces only desired output on Quiet" {
+
+            $th = New-TestHost
+            $rs = [runspacefactory]::Createrunspace($th)
+            $rs.open()
+            $ps = [powershell]::Create()
+            $ps.Runspace = $rs
+            $ps.Commands.Clear()
+
+            $result = $ps.AddScript("Test-Connection -TargetName '$targetName' -Quiet | Out-Null ").Invoke()
+
+            $th.UI.Streams.ConsoleOutput.Count | Should -Be 0
+
+            $rs.Close()
+            $rs.Dispose()
+            $ps.Dispose()
+
+        }
+
         It "Ping fake host" {
 
             { $result = Test-Connection "fakeHost" -Count 1 -Quiet -ErrorAction Stop } | ShouldBeErrorId "TestConnectionException,Microsoft.PowerShell.Commands.TestConnectionCommand"
@@ -247,17 +266,18 @@ Describe "Test-Connection" -tags "CI" {
 
         It "Quiet works" {
             $result = Test-Connection $realName -TraceRoute -Quiet
-
+            Mock Write-Host { throw "you called write-host" }
+            { $result } | Should Not throw
             $result | Should -BeTrue
         }
     }
-    
+
     Context "Connection" {
         BeforeAll {
             # Ensure the local host listen on port 80
             $WebListener = Start-WebListener
         }
-        
+
         It "Test connection to local host port 80" {
             Test-Connection '127.0.0.1' -TCPPort $WebListener.HttpPort | Should -BeTrue
         }
@@ -266,4 +286,4 @@ Describe "Test-Connection" -tags "CI" {
             Test-Connection $UnreachableAddress -TCPPort 80 -TimeOut 1 | Should -BeFalse
         }
     }
-} 
+}
